@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Node:
-    def __init__(self, x, y):
+    def __init__(self, x, y, mass = 1, rot_mass = 1):
         self.x = x
         self.y = y
         self.globalDoFx = None
@@ -26,6 +26,9 @@ class Node:
         self.xLoad = 0
         self.yLoad = 0
         self.zLoad = 0
+
+        self.mass = mass
+        self.rot_mass = rot_mass
 
     def constrain(self, x, y, z):
         self.xConstrain = (x, 0)
@@ -147,6 +150,10 @@ class Structure:
         for beam in self.beams:
             beam.U = beam.sparsityMatrix.dot(self.solution)
             beam.F = np.round(beam.T.T.dot(beam.K.dot(beam.T.dot(beam.U))), 3)
+            beam.n1.ux = beam.U[0]
+            beam.n1.uy = beam.U[1]
+            beam.n2.ux = beam.U[3]
+            beam.n2.uy = beam.U[4]
         return
 
     def structDraw(self, ax):
