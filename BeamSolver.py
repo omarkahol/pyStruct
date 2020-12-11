@@ -41,7 +41,7 @@ class Node:
         self.zLoad = z
 
 class Beam:
-    def __init__(self, node1, node2, E, J, A):
+    def __init__(self, node1, node2, E, J, A, rho):
         self.E = E
         self.J = J
         self.A = A
@@ -54,6 +54,8 @@ class Beam:
         self.x2 = node2.x
         self.y2 = node2.y
 
+        self.rho = rho
+
         self.L = sqrt((self.y2 - self.y1) ** 2 + (self.x2 - self.x1) ** 2)
 
         self.alfa = atan2(self.y2 - self.y1, self.x2 - self.x1)
@@ -65,6 +67,15 @@ class Beam:
              [0, 0, 0, -sin(self.alfa), cos(self.alfa), 0],
              [0, 0, 0, 0, 0, 1]
              ])
+
+        self.M = np.array([
+            [140,0,0,70,0,0],
+            [0,156,22*self.L,0,54,-13*self.L],
+            [0,22*self.L,4*self.L**2,0,13*self.L,-3*self.L**2],
+            [70,0,0,140,0,0],
+            [0,54,13*self.L,0,156,-22*self.L],
+            [0,-13*self.L,-3*self.L**2,0,-22*self.L,4*self.L**2]
+        ])*self.rho*self.A*self.L/420
         self.sparsityMatrix = None
         self.K = np.array(
             [
@@ -100,6 +111,7 @@ class Structure:
         self.beams = beams
         self.nDoFs = None
         self.K = None
+        self.M = None
         self.solution = None
         return
 
@@ -116,31 +128,42 @@ class Structure:
 
     def defineSystem(self):
         self.K = 0
+        self.M = 0
 
         for beam in self.beams:
             self.K += beam.sparsityMatrix.T.dot(beam.T.T.dot(beam.K.dot(beam.T.dot(beam.sparsityMatrix))))
+            self.M += beam.sparsityMatrix.T.dot(beam.T.T.dot(beam.M.dot(beam.T.dot(beam.sparsityMatrix))))
 
-        self.p = np.zeros(self.nDoFs)
+        self.RHS = np.zeros(self.nDoFs)
         for i, node in enumerate(self.nodes):
-            self.p[3 * i] = node.xLoad
-            self.p[3 * i + 1] = node.yLoad
-            self.p[3 * i + 2] = node.zLoad
+            self.RHS[3 * i] = node.xLoad
+            self.RHS[3 * i + 1] = node.yLoad
+            self.RHS[3 * i + 2] = node.zLoad
 
             if node.xConstrain[0]:
                 self.K[node.globalDoFx, :] = 0
                 self.K[:, node.globalDoFx] = 0
                 self.K[node.globalDoFx, node.globalDoFx] = 1
-                self.p[node.globalDoFx]=0
+                self.M[node.globalDoFx, :] = 0
+                self.M[:, node.globalDoFx] = 0
+                self.M[node.globalDoFx, node.globalDoFx] = 1
+                self.RHS[node.globalDoFx]=0
             if node.yConstrain[0]:
                 self.K[node.globalDoFy, :] = 0
                 self.K[:, node.globalDoFy] = 0
                 self.K[node.globalDoFy, node.globalDoFy] = 1.
-                self.p[node.globalDoFy] = 0
+                self.M[node.globalDoFy, :] = 0
+                self.M[:, node.globalDoFy] = 0
+                self.M[node.globalDoFy, node.globalDoFy] = 1.
+                self.RHS[node.globalDoFy] = 0
             if node.zConstrain[0]:
                 self.K[node.globalDoFz, :] = 0
                 self.K[:, node.globalDoFz] = 0
                 self.K[node.globalDoFz, node.globalDoFz] = 1.
-                self.p[node.globalDoFz] = 0
+                self.M[node.globalDoFz, :] = 0
+                self.M[:, node.globalDoFz] = 0
+                self.M[node.globalDoFz, node.globalDoFz] = 1.
+                self.RHS[node.globalDoFz] = 0
         return
 
     def solveSystem(self):

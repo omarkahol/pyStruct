@@ -33,11 +33,11 @@ class Node:
         self.thetaLoad = theta
 
 class Beam:
-    def __init__(self, node1, node2, E, J, A, mass):
+    def __init__(self, node1, node2, E, J, A, rho):
         self.E = E
         self.J = J
         self.A = A
-        self.mass = mass
+        self.rho = rho
 
         self.n1 = node1
         self.n2 = node2
@@ -61,8 +61,8 @@ class Beam:
             [
                 [12,6*self.L,-12,6*self.L],
                 [6*self.L,4*self.L**2,-6*self.L,2*self.L**2],
-                [-12, -4 * self.L, 12, -6 * self.L],
-                [6 * self.L, 3 * self.L ** 2, -6 * self.L, 4 * self.L ** 2]
+                [-12, -6 * self.L, 12, -6 * self.L],
+                [6 * self.L, 2 * self.L ** 2, -6 * self.L, 4 * self.L ** 2]
             ]) * self.E*self.J / self.L**3
         self.M = np.array(
             [
@@ -70,7 +70,7 @@ class Beam:
                 [22*self.L,4*self.L**2, 13*self.L,-3*self.L**2],
                 [54,13*self.L,156,-22*self.L],
                 [-13*self.L, -3*self.L**2, -22*self.L,4*self.L**2]
-            ]) * self.mass / 420
+            ]) * self.L*self.A*self.rho / 420
         return
 
     def buildSparsityMatrix(self, nnodes):
@@ -107,7 +107,7 @@ class Structure:
 
         for beam in self.beams:
             self.K += beam.sparsityMatrix.T.dot(beam.T.T.dot(beam.K.dot(beam.T.dot(beam.sparsityMatrix))))
-            self.M += beam.sparsityMatrix.T.dot(beam.M.dot(beam.sparsityMatrix))
+            self.M += beam.sparsityMatrix.T.dot(beam.T.T.dot(beam.M.dot(beam.T.dot(beam.sparsityMatrix))))
 
         self.RHS = np.zeros(self.nDoFs)
         for i, node in enumerate(self.nodes):
@@ -118,10 +118,16 @@ class Structure:
                 self.K[node.globalDoFy, :] = 0
                 self.K[:, node.globalDoFy] = 0
                 self.K[node.globalDoFy, node.globalDoFy] = 1
+                self.M[node.globalDoFy, :] = 0
+                self.M[:, node.globalDoFy] = 0
+                self.M[node.globalDoFy, node.globalDoFy] = 1
                 self.RHS[node.globalDoFy]=0
             if node.thetaConstrain:
                 self.K[node.globalDoFtheta, :] = 0
                 self.K[:, node.globalDoFtheta] = 0
                 self.K[node.globalDoFtheta, node.globalDoFtheta] = 1
+                self.M[node.globalDoFtheta, :] = 0
+                self.M[:, node.globalDoFtheta] = 0
+                self.M[node.globalDoFtheta, node.globalDoFtheta] = 1
                 self.RHS[node.globalDoFtheta] = 0
         return
