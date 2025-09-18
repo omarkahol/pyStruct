@@ -50,20 +50,73 @@ pip install numpy matplotlib
 
 ### Beam Solver Example
 See [`testBeam.py`](testBeam.py) for a sample script using the BeamSolver:
+
 ```python
-from BEAM.BeamSolver import *
-# Define nodes, constraints, loads, and beams
-# Solve and plot results
+# Import BeamSolver and supporting classes
+from BEAM.BeamSolver import Node, Beam, Structure
+
+# 1. Define nodes with coordinates
+n1 = Node(x1, y1)
+n2 = Node(x2, y2)
+n3 = Node(x3, y3)
+# ... more nodes as needed
+
+# 2. Apply constraints to nodes (e.g., clamped, free)
+n1.constrain(True, True, True)  # Fully fixed
+n3.constrain(False, True, False)  # Partially fixed
+
+# 3. Apply loads to nodes
+n2.load(Fx, Fy, M)
+# ... more loads as needed
+
+# 4. Create beams between nodes with material properties
+b1 = Beam(n1, n2, E, I, A, rho)
+b2 = Beam(n2, n3, E, I, A, rho)
+# ... more beams as needed
+
+# 5. Assemble structure and solve
+structure = Structure([n1, n2, n3], [b1, b2])
+structure.assemble()
+structure.solve()
+
+# 6. Post-process and plot results
+structure.plot_deformed_shape()
+structure.plot_internal_forces()
 ```
 
 ### Finite Element Example
 See [`testFEM.py`](testFEM.py) for a sample script using the FEM solver:
+
 ```python
+# Import mesh generator, FEM routines, nonlinear solver, and material models
 from FEM.mesh import generate_quad_mesh
 from FEM.fem import KM_global
 from FEM.newtonSolver import solve_system
 from material import linear_material_law, bilinear_material
-# Generate mesh, assemble matrices, solve nonlinear system
+
+# 1. Define geometry and mesh parameters
+Lx, Ly = ...  # Domain size
+nelemx, nelemy = ...  # Number of elements
+
+# 2. Generate mesh (nodes and element connectivity)
+nodes, elems = generate_quad_mesh(Lx, Ly, nelemx, nelemy)
+
+# 3. Define material law (linear or bilinear)
+material_law = linear_material_law  # or bilinear_material
+
+# 4. Assemble global stiffness/mass matrices and force vector
+K, M, Fint = KM_global(elems, nodes, material_law, rho, u_elem, thickness)
+
+# 5. Apply boundary conditions and external loads
+free_dofs = ...  # Indices of unconstrained DOFs
+F = ...          # External force vector
+
+# 6. Solve nonlinear system using Newton-Raphson
+u = solve_system(nodes, elems, free_dofs, F, material_law, rho, thickness)
+
+# 7. Post-process results (e.g., plot deformed mesh, stress distribution)
+plot_deformed_mesh(nodes, u)
+plot_stress_distribution(elems, u)
 ```
 
 ### Material Models
